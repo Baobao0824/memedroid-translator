@@ -22,11 +22,11 @@ SAVE_PATH = Path("./downloaded_memes")
 def parse_cli():
     p = argparse.ArgumentParser(description="Memedroid 图片批量下载")
     p.add_argument(
-        "-p", "--pages", type=int, default=10, help="要抓取的页数（默认 10）"
+        "-p", "--pages", type=int, default=MAX_PAGE_NUM, help="要抓取的页数（默认 1）"
     )
     args = p.parse_args()
     # 如果用户给的是 0 或负数，也强制用默认值
-    return args.pages if args.pages > 0 else 10
+    return args.pages if args.pages > 0 else MAX_PAGE_NUM
 
 
 # 保存图片
