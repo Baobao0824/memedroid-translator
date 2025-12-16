@@ -4,33 +4,32 @@ from pathlib import Path
 import hashlib
 from playwright.async_api import Page
 import argparse, sys, os
+from functions.config_loader import CONFIG
+import alibabacloud_oss_v2 as oss
 
-# oss相关环境变量
-ENDPOINT = os.getenv('OSS_ENDPOINT')
-BUCKET_NAME = os.getenv('OSS_BUCKET_NAME')
-ACCESS_KEY_ID = os.getenv('OSS_ACCESS_KEY_ID')
-ACCESS_KEY_SECRET = os.getenv('OSS_ACCESS_KEY_SECRET')
-USE_OSS = all([ENDPOINT, BUCKET_NAME, ACCESS_KEY_ID, ACCESS_KEY_SECRET])
+# 阿里云 OSS 相关常量
+# 凭证信息
+CREDENTIALS_PROVIER = oss.credentials.StaticCredentialsProvider(
+    access_key_id=CONFIG["oss"]["access_key_id"],
+    access_key_secret=CONFIG["oss"]["access_key_secret"],
+)
+OSS_CONFIG = oss.config.load_default()
+OSS_CONFIG.credentials_provider = CREDENTIALS_PROVIER
+OSS_CONFIG.region=CONFIG["oss"]["region"]
+OSS_CLIENT = oss.Client(OSS_CONFIG)
 
 # 爬虫本体相关常量
 LINK_URL = "https://www.memedroid.com/memes/random"
-MAX_PAGE_NUM = 1
+MAX_PAGE_NUM = CONFIG["crawler"]["max_page_num"]
 NUM_PER_PAGE = 20
-SAVE_PATH = Path("./downloaded_memes")
+SAVE_PATH = Path(CONFIG["crawler"]["save_path"])
 
-
-def parse_cli():
-    p = argparse.ArgumentParser(description="Memedroid 图片批量下载")
-    p.add_argument(
-        "-p", "--pages", type=int, default=MAX_PAGE_NUM, help="要抓取的页数（默认 1）"
-    )
-    args = p.parse_args()
-    # 如果用户给的是 0 或负数，也强制用默认值
-    return args.pages if args.pages > 0 else MAX_PAGE_NUM
+async def save_image_oss(image_url: str, page: Page):
+    pass
 
 
 # 保存图片
-async def save_image(image_url: str, page: Page):
+async def save_image_local(image_url: str, page: Page):
     # 没有文件夹则创建路径
     SAVE_PATH.mkdir(parents=True, exist_ok=True)
     try:
@@ -51,12 +50,11 @@ async def save_image(image_url: str, page: Page):
         print(f"Request error: {e}")
         return
 
-
-async def main():
+async def get_image_list(save_oss: bool):
     # 根据页码生成对应的URL
     def get_page_url(num):
         return LINK_URL + f"?page={num}"
-
+    result = []
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(
@@ -82,11 +80,15 @@ async def main():
                     if src is None:
                         raise Exception("Image src attribute is empty")
                     else:
-                        await save_image(src, page)
+                        if save_oss:
+                            save_image_oss(src, page)
+                        else:
+                            await save_image_local(src, page)
         except Exception as e:
             print(f"Error occurred: {e}")
+        return result
+
+
 
 
 if __name__ == "__main__":
-    MAX_PAGE_NUM = parse_cli()
-    asyncio.run(main())
