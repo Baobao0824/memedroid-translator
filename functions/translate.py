@@ -1,24 +1,58 @@
 import httpx, os, uuid
-import youdao_utils
+import functions.youdao_utils as youdao_utils
 import asyncio
 from pathlib import Path
 import base64
+import alibabacloud_oss_v2 as oss
+import alibabacloud_oss_v2.aio as oss_aio
+from functions.config_loader import CONFIG
 
-# # 有道的应用ID和密钥，从环境变量中获取
-# APP_ID = os.getenv("APP_ID")
-# APP_SECRET = os.getenv("APP_SECRET")
-APP_ID = "700bb7060b88d1c5"
-APP_SECRET = "RFSYK000eGR41yUvRoCj9Mn7wjp0V4gW"
+# # 有道的应用ID和密钥，从配置文件中获取
+APP_ID = CONFIG["translate"]["app_id"]
+APP_SECRET = CONFIG["translate"]["app_secret"]
+
+# 阿里云 OSS 相关常量
+# 凭证信息
+CREDENTIALS_PROVIER = oss.credentials.StaticCredentialsProvider(
+    access_key_id=CONFIG["oss"]["access_key_id"],
+    access_key_secret=CONFIG["oss"]["access_key_secret"],
+)
+OSS_CONFIG = oss.config.load_default()
+OSS_CONFIG.credentials_provider = CREDENTIALS_PROVIER
+OSS_CONFIG.region = CONFIG["oss"]["region"]
+OSS_CLIENT = oss_aio.AsyncClient(OSS_CONFIG)
 
 # 接口地址
 URL = "https://openapi.youdao.com/ocrtransapi"
-INPUT_DIR = Path("./downloaded_memes")
-OUTPUT_DIR = Path("./chinese_memes")
+INPUT_DIR = Path(CONFIG["crawler"]["save_path"])
+OUTPUT_DIR = Path(CONFIG["translate"]["output_path"])
 
 
-async def save_image(base64_str: str, origin_path: Path) -> None:
+async def save_image_oss(base64_str: str, origin_path: Path) -> None:
     """
-    保存图片
+    上传到oss
+
+    :param base64_str: base64编码后的英文图片字符串
+    :type base64_str: str
+    :param origin_path: 英文版图片的Path路径
+    :type origin_path: Path
+    """
+    try:
+        image_bytes = base64.b64decode(base64_str)
+        name = str(Path(CONFIG["crawler"]["save_path"])) + "/" + (base64_str + ".jpg")
+        # 上传到阿里云OSS
+        put_object_request = oss.PutObjectRequest(
+            bucket=CONFIG["oss"]["bucket_name"], key=name, body=image_bytes
+        )
+        await OSS_CLIENT.put_object(put_object_request)
+        print(f"Uploaded translated image to OSS: {name}")
+    except Exception as e:
+        print(f"OSS upload error: {e}")
+        return
+
+async def save_image_local(base64_str: str, origin_path: Path) -> None:
+    """
+    本地保存图片
 
     :param base64_str: base64编码后的英文图片字符串
     :type base64_str: str
@@ -31,11 +65,10 @@ async def save_image(base64_str: str, origin_path: Path) -> None:
     Path(OUTPUT_DIR / file_name).write_bytes(image_bytes)
     print("translate success:" + file_name)
 
-
 async def translate_one(path: Path) -> None:
     """
     translate_one 的 翻译一张图片
-    
+
     :param path: 图片路径
     :type path: Path
     """
@@ -53,17 +86,38 @@ async def translate_one(path: Path) -> None:
         )
         r.raise_for_status()
         response_obj = r.json()
-        await save_image(response_obj["render_image"], path)
+        # TODO: 存储到阿里云OSS的判定
+        # await save_image(response_obj["render_image"], path)
 
 
-async def translate_all()->None:
+async def get_image_list_from_oss() -> None:
+    """
+    从阿里云OSS容器中提取图片列表
+    TODO: 想办法下载多个文件，因为我们不知道具体的文件名是什么
+    """
+    try:
+        get_object_request = oss.GetObjectRequest(
+            bucket=CONFIG["oss"]["bucket_name"],
+            key=CONFIG["crawler"]["save_path"] + "/0c24d96b8af3ecefdfee62bdb7ed3078.jpg",
+        )
+        result = await OSS_CLIENT.get_object(get_object_request)
+        print(result)
+    except Exception as e:
+        print(f"OSS get object error: {e}")
+    finally:
+        await OSS_CLIENT.close()
+
+
+async def translate_all() -> None:
     """
     翻译INPUT_DIR下面的所有图片
+    TODO: 从阿里云OSS容器中提取
     """
-    finished_images = {p.name for p in OUTPUT_DIR.iterdir()}
-    image_files = [p for p in INPUT_DIR.iterdir() if p.name not in finished_images]
-    for i in image_files:
-        await translate_one(i)
+    await get_image_list_from_oss()
+    # finished_images = {p.name for p in OUTPUT_DIR.iterdir()}
+    # image_files = [p for p in INPUT_DIR.iterdir() if p.name not in finished_images]
+    # for i in image_files:
+    #     await translate_one(i)
 
 
 if __name__ == "__main__":

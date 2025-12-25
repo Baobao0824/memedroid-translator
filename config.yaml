@@ -1,8 +1,12 @@
 crawler:
   max_page_num: 1
-  save_path: './memes_en'
+  save_path: 'memes_en'
 oss:
   access_key_id: 'LTAI5tJxNpNvZNSMnmuk7XPN'
   access_key_secret: 'e5AQKXUt4yhPuHWI7gWlrhqimL7rlx'
   bucket_name: 'baobao0824-meme'
   region: 'cn-beijing'
+translate:
+  app_id: "700bb7060b88d1c5"
+  app_secret: "RFSYK000eGR41yUvRoCj9Mn7wjp0V4gW"
+  output_path: 'chinese_memes'
