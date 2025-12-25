@@ -3,34 +3,55 @@ import asyncio
 from pathlib import Path
 import hashlib
 from playwright.async_api import Page
-import argparse, sys, os
+from functions.config_loader import CONFIG
+import alibabacloud_oss_v2 as oss
+import alibabacloud_oss_v2.aio as oss_aio
 
-# oss相关环境变量
-ENDPOINT = os.getenv('OSS_ENDPOINT')
-BUCKET_NAME = os.getenv('OSS_BUCKET_NAME')
-ACCESS_KEY_ID = os.getenv('OSS_ACCESS_KEY_ID')
-ACCESS_KEY_SECRET = os.getenv('OSS_ACCESS_KEY_SECRET')
-USE_OSS = all([ENDPOINT, BUCKET_NAME, ACCESS_KEY_ID, ACCESS_KEY_SECRET])
+# 阿里云 OSS 相关常量
+# 凭证信息
+CREDENTIALS_PROVIER = oss.credentials.StaticCredentialsProvider(
+    access_key_id=CONFIG["oss"]["access_key_id"],
+    access_key_secret=CONFIG["oss"]["access_key_secret"],
+)
+OSS_CONFIG = oss.config.load_default()
+OSS_CONFIG.credentials_provider = CREDENTIALS_PROVIER
+OSS_CONFIG.region = CONFIG["oss"]["region"]
+OSS_CLIENT = oss_aio.AsyncClient(OSS_CONFIG)
 
 # 爬虫本体相关常量
 LINK_URL = "https://www.memedroid.com/memes/random"
-MAX_PAGE_NUM = 1
+MAX_PAGE_NUM = CONFIG["crawler"]["max_page_num"]
 NUM_PER_PAGE = 20
-SAVE_PATH = Path("./downloaded_memes")
+SAVE_PATH = Path(CONFIG["crawler"]["save_path"])
 
 
-def parse_cli():
-    p = argparse.ArgumentParser(description="Memedroid 图片批量下载")
-    p.add_argument(
-        "-p", "--pages", type=int, default=MAX_PAGE_NUM, help="要抓取的页数（默认 1）"
-    )
-    args = p.parse_args()
-    # 如果用户给的是 0 或负数，也强制用默认值
-    return args.pages if args.pages > 0 else MAX_PAGE_NUM
+async def save_image_oss(image_url: str, page: Page):
+    try:
+        resp = await page.request.get(image_url)
+        if not resp.ok:
+            raise Exception(f"Failed to download image: {image_url}")
+        else:
+            data = await resp.body()
+            name = Path(CONFIG["crawler"]["save_path"]) / (
+                hashlib.md5(data).hexdigest() + ".jpg"
+            )
+            # 上传到 OSS
+            put_object_request = oss.PutObjectRequest(
+                bucket=CONFIG["oss"]["bucket_name"],
+                key=str(name),
+                content=data,
+                metadata={"image/png": "image/png"},
+            )
+            await OSS_CLIENT.put_object(put_object_request)
+            print(f"Uploaded image to OSS: {name}")
+    except Exception as e:
+        print(f"Request error: {e}")
+        return
+    pass
 
 
 # 保存图片
-async def save_image(image_url: str, page: Page):
+async def save_image_local(image_url: str, page: Page):
     # 没有文件夹则创建路径
     SAVE_PATH.mkdir(parents=True, exist_ok=True)
     try:
@@ -52,11 +73,12 @@ async def save_image(image_url: str, page: Page):
         return
 
 
-async def main():
+async def get_image_list(save_oss: bool):
     # 根据页码生成对应的URL
     def get_page_url(num):
         return LINK_URL + f"?page={num}"
 
+    result = []
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(
@@ -72,7 +94,7 @@ async def main():
             # 循环访问页面
             for i in range(1, MAX_PAGE_NUM + 1):
                 page_url = get_page_url(i)
-                await page.goto(page_url, wait_until="domcontentloaded")
+                await page.goto(page_url, wait_until="domcontentloaded", timeout=0)
                 # 等待图片加载完成
                 await page.locator(".img-responsive").last.wait_for()
                 # 获取图片元素
@@ -82,11 +104,13 @@ async def main():
                     if src is None:
                         raise Exception("Image src attribute is empty")
                     else:
-                        await save_image(src, page)
+                        if save_oss:
+                            await save_image_oss(src, page)
+                        else:
+                            await save_image_local(src, page)
         except Exception as e:
             print(f"Error occurred: {e}")
 
 
 if __name__ == "__main__":
-    MAX_PAGE_NUM = parse_cli()
-    asyncio.run(main())
+    asyncio.run(get_image_list(save_oss=True))

@@ -1,0 +1,8 @@
+crawler:
+  max_page_num: 1
+  save_path: './memes_en'
+oss:
+  access_key_id: 'LTAI5tJxNpNvZNSMnmuk7XPN'
+  access_key_secret: 'e5AQKXUt4yhPuHWI7gWlrhqimL7rlx'
+  bucket_name: 'baobao0824-meme'
+  region: 'cn-beijing'
