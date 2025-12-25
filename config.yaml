@@ -10,3 +10,4 @@ translate:
   app_id: "700bb7060b88d1c5"
   app_secret: "RFSYK000eGR41yUvRoCj9Mn7wjp0V4gW"
   output_path: 'chinese_memes'
+  max_key_length: 100

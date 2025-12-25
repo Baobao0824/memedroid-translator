@@ -1,4 +1,5 @@
-import httpx, os, uuid
+from typing import List
+import httpx
 import functions.youdao_utils as youdao_utils
 import asyncio
 from pathlib import Path
@@ -65,13 +66,28 @@ async def save_image_local(base64_str: str, origin_path: Path) -> None:
     Path(OUTPUT_DIR / file_name).write_bytes(image_bytes)
     print("translate success:" + file_name)
 
-async def translate_one(path: Path) -> None:
+async def translate_one_from_oss(key:str) -> None:
     """
     translate_one 的 翻译一张图片
-
-    :param path: 图片路径
-    :type path: Path
+    TODO: 直接从阿里云OSS下载图片进行翻译。因为有道传的是base64，因此应该可以直接把字节转成base64传过去。
+    :param key: 图片在OSS中的key
+    :type key: str
     """
+    try:
+        get_request = oss.GetObjectRequest(
+            bucket=CONFIG["oss"]["bucket_name"],
+            key = key
+        )
+        response = await OSS_CLIENT.get_object(get_request)
+        if not response.body:
+            raise Exception(f"Failed to download image from OSS: {key}")
+        with response.body as body_stream:
+
+        image_bytes = response.body.read()
+        base64_str = base64.b64encode(image_bytes)
+
+
+
     base64_str = youdao_utils.readFileAsBase64(path=path)
     data = {"q": base64_str, "from": "auto", "to": "auto", "render": "1", "type": "1"}
     httpx.post(
@@ -87,33 +103,43 @@ async def translate_one(path: Path) -> None:
         r.raise_for_status()
         response_obj = r.json()
         # TODO: 存储到阿里云OSS的判定
-        # await save_image(response_obj["render_image"], path)
+        await save_image_local(response_obj["render_image"], Path(key))
 
-
-async def get_image_list_from_oss() -> None:
+async def get_en_list_from_oss() ->List[str] :
     """
     从阿里云OSS容器中提取图片列表
-    TODO: 想办法下载多个文件，因为我们不知道具体的文件名是什么
     """
     try:
-        get_object_request = oss.GetObjectRequest(
+        object_keys = []
+        continuation_token = None
+        get_objects_request = oss.ListObjectsV2Request(
             bucket=CONFIG["oss"]["bucket_name"],
-            key=CONFIG["crawler"]["save_path"] + "/0c24d96b8af3ecefdfee62bdb7ed3078.jpg",
+            prefix=CONFIG["crawler"]["save_path"] + "/",
+            max_keys=CONFIG["translate"]["max_key_length"],
+            continuation_token=continuation_token,
         )
-        result = await OSS_CLIENT.get_object(get_object_request)
-        print(result)
+        # 获取对象列表
+        result = await OSS_CLIENT.list_objects_v2(get_objects_request)
+        if result.contents is not None:
+            for obj in result.contents:
+                print(f"Found object in OSS: {obj.key}")
+                object_keys.append(obj.key)
+        else:
+            raise Exception("No objects found in OSS bucket.")
     except Exception as e:
         print(f"OSS get object error: {e}")
     finally:
         await OSS_CLIENT.close()
+        return object_keys
 
 
 async def translate_all() -> None:
     """
     翻译INPUT_DIR下面的所有图片
-    TODO: 从阿里云OSS容器中提取
+    TODO: 从阿里云OSS容器中提取，然后改造这一段
     """
-    await get_image_list_from_oss()
+    await get_en_list_from_oss()
+
     # finished_images = {p.name for p in OUTPUT_DIR.iterdir()}
     # image_files = [p for p in INPUT_DIR.iterdir() if p.name not in finished_images]
     # for i in image_files:

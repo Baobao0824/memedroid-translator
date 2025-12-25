@@ -17,6 +17,7 @@ class _Translate(TypedDict):
     app_id: str
     app_secret: str
     output_path: str
+    max_key_length: int
 
 
 class ConfigDict(TypedDict):
