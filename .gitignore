@@ -15,3 +15,6 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+
+#DEV
+config.dev.yaml

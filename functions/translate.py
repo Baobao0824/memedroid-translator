@@ -8,7 +8,7 @@ import alibabacloud_oss_v2 as oss
 import alibabacloud_oss_v2.aio as oss_aio
 from functions.config_loader import CONFIG
 
-# # 有道的应用ID和密钥，从配置文件中获取
+# 有道的应用ID和密钥，从配置文件中获取
 APP_ID = CONFIG["translate"]["app_id"]
 APP_SECRET = CONFIG["translate"]["app_secret"]
 
@@ -29,18 +29,17 @@ INPUT_DIR = Path(CONFIG["crawler"]["save_path"])
 OUTPUT_DIR = Path(CONFIG["translate"]["output_path"])
 
 
-async def save_image_oss(base64_str: str, origin_path: Path) -> None:
+async def save_image_oss(base64_str: str, name: str) -> None:
     """
     上传到oss
-
     :param base64_str: base64编码后的英文图片字符串
     :type base64_str: str
-    :param origin_path: 英文版图片的Path路径
-    :type origin_path: Path
+    :param name: 文件名，一般来说必须和原名一样
+    :type name: str
     """
     try:
         image_bytes = base64.b64decode(base64_str)
-        name = str(Path(CONFIG["crawler"]["save_path"])) + "/" + (base64_str + ".jpg")
+        name = str(Path(CONFIG["translate"]["output_path"])) + "/" + name
         # 上传到阿里云OSS
         put_object_request = oss.PutObjectRequest(
             bucket=CONFIG["oss"]["bucket_name"], key=name, body=image_bytes
@@ -50,6 +49,7 @@ async def save_image_oss(base64_str: str, origin_path: Path) -> None:
     except Exception as e:
         print(f"OSS upload error: {e}")
         return
+
 
 async def save_image_local(base64_str: str, origin_path: Path) -> None:
     """
@@ -66,31 +66,33 @@ async def save_image_local(base64_str: str, origin_path: Path) -> None:
     Path(OUTPUT_DIR / file_name).write_bytes(image_bytes)
     print("translate success:" + file_name)
 
-async def translate_one_from_oss(key:str) -> None:
+
+async def translate_one_from_oss(key: str) -> None:
     """
     translate_one 翻译一张图片
     :param key: 图片在OSS中的key
     :type key: str
     """
     try:
-        get_request = oss.GetObjectRequest(
-            bucket=CONFIG["oss"]["bucket_name"],
-            key = key
-        )
+        file_name = key.split("/")[-1]
+        get_request = oss.GetObjectRequest(bucket=CONFIG["oss"]["bucket_name"], key=key)
         response = await OSS_CLIENT.get_object(get_request)
         if not response.body:
             raise Exception(f"Failed to download image from OSS: {key}")
         # FIXME: 这里的问题不知道怎么修复，但是代码本身是没问题的
-        image_bytes = await response.body.read() #type: ignore
-        if isinstance(image_bytes,bytes):
+        image_bytes = await response.body.read()  # type: ignore
+        if isinstance(image_bytes, bytes):
             base64_str = base64.b64encode(image_bytes).decode()
         else:
             raise Exception(f"Failed to change b64 : {key}")
-        print(base64_str)
-        data = {"q": base64_str, "from": "auto", "to": "auto", "render": "1", "type": "1"}
-        httpx.post(
-            URL
-        )
+        data = {
+            "q": base64_str,
+            "from": "auto",
+            "to": "auto",
+            "render": "1",
+            "type": "1",
+        }
+        httpx.post(URL)
         youdao_utils.addAuthParams(APP_ID, APP_SECRET, data)
         async with httpx.AsyncClient() as client:
             r = await client.post(
@@ -100,24 +102,34 @@ async def translate_one_from_oss(key:str) -> None:
             )
             r.raise_for_status()
             response_obj = r.json()
-            # TODO: 存储到阿里云OSS的判定
-            await save_image_local(response_obj["render_image"], Path(key))
+            await save_image_oss(response_obj["render_image"], file_name)
     except Exception as e:
         print(e)
     finally:
         await OSS_CLIENT.close()
 
-async def get_en_list_from_oss() ->List[str] :
+
+async def get_list_from_oss(mode: str) -> List[str]:
     """
-    从阿里云OSS容器中提取图片列表
+    从阿里云容器中获取中英文图片list，
+
+    :param mode: 模式，必须是'en'或'zh'
+    :type mode: str
+    :return: 返回的list（图片key）
+    :rtype: List[str]
     """
+    prefix = (
+        CONFIG["crawler"]["save_path"]
+        if mode == "en"
+        else CONFIG["translate"]["output_path"]
+    )
     try:
         object_keys = []
         continuation_token = None
         get_objects_request = oss.ListObjectsV2Request(
             bucket=CONFIG["oss"]["bucket_name"],
             # 这里其实写死也没事，毕竟阿里云oss用的就是'/'，如果你用Path的话，在win上面反而会拼错
-            prefix=CONFIG["crawler"]["save_path"] + "/",
+            prefix=prefix + "/",
             max_keys=CONFIG["translate"]["max_key_length"],
             continuation_token=continuation_token,
         )
@@ -125,7 +137,6 @@ async def get_en_list_from_oss() ->List[str] :
         result = await OSS_CLIENT.list_objects_v2(get_objects_request)
         if result.contents is not None:
             for obj in result.contents:
-                print(f"Found object in OSS: {obj.key}")
                 object_keys.append(obj.key)
         else:
             raise Exception("No objects found in OSS bucket.")
@@ -138,16 +149,15 @@ async def get_en_list_from_oss() ->List[str] :
 
 async def translate_all() -> None:
     """
-    翻译INPUT_DIR下面的所有图片
-    TODO: 从阿里云OSS容器中提取，然后改造这一段。翻译已经写完了，之后就可以写这边了
+    翻译crawler的目录下面的所有图片
     """
-    # await get_en_list_from_oss()
-    await translate_one_from_oss('memes_en/ItemSprite_diamond.png')
-
-    # finished_images = {p.name for p in OUTPUT_DIR.iterdir()}
-    # image_files = [p for p in INPUT_DIR.iterdir() if p.name not in finished_images]
-    # for i in image_files:
-    #     await translate_one(i)
+    # 从空器中找到英文图片list
+    en_list = await get_list_from_oss("en")
+    # 中文list
+    finished_images = await get_list_from_oss("zh")
+    en_list = [p for p in en_list if p not in finished_images]
+    for i in en_list:
+        await translate_one_from_oss(i)
 
 
 if __name__ == "__main__":
