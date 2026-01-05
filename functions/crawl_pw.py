@@ -7,6 +7,7 @@ from functions.config_loader import CONFIG
 import alibabacloud_oss_v2 as oss
 import alibabacloud_oss_v2.aio as oss_aio
 
+
 # 阿里云 OSS 相关常量
 # 凭证信息
 CREDENTIALS_PROVIER = oss.credentials.StaticCredentialsProvider(
@@ -24,31 +25,30 @@ MAX_PAGE_NUM = CONFIG["crawler"]["max_page_num"]
 NUM_PER_PAGE = 20
 SAVE_PATH = Path(CONFIG["crawler"]["save_path"])
 
-
 async def save_image_oss(image_url: str, page: Page):
-    '''
+    """
     上传到oss
-    
+
     :param image_url: 图片链接
-    :type image_url: str 
+    :type image_url: str
     :param page: playwright的page对象
     :type page: Page
-    '''
+    """
     try:
         resp = await page.request.get(image_url)
         if not resp.ok:
             raise Exception(f"Failed to download image: {image_url}")
         else:
             data = await resp.body()
-            name = str(Path(CONFIG["crawler"]["save_path"])) +'/'+ (
-                hashlib.md5(data).hexdigest() + ".jpg"
+            name = (
+                str(Path(CONFIG["crawler"]["save_path"]))
+                + "/"
+                + (hashlib.md5(data).hexdigest() + ".jpg")
             )
             # 我去原来这么传就行了啊
             # 上传到阿里云OSS
             put_object_request = oss.PutObjectRequest(
-                bucket=CONFIG["oss"]["bucket_name"],
-                key=name,
-                body=data
+                bucket=CONFIG["oss"]["bucket_name"], key=name, body=data
             )
             await OSS_CLIENT.put_object(put_object_request)
             print(f"Uploaded image to OSS: {name}")
@@ -83,10 +83,12 @@ async def save_image_local(image_url: str, page: Page):
         return
 
 
+
 async def get_image_list(save_oss: bool):
     # 根据页码生成对应的URL
     def get_page_url(num):
         return LINK_URL + f"?page={num}"
+
     result = []
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -122,4 +124,4 @@ async def get_image_list(save_oss: bool):
 
 
 if __name__ == "__main__":
-    asyncio.run(get_image_list(save_oss=True))
+    asyncio.run(get_image_list(save_oss=False))
