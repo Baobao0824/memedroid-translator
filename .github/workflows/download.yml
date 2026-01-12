@@ -1,8 +1,0 @@
-name: Download English Images
-on: [push]
-jobs:
-    download-english-images:
-        runs-on: ubuntu-latest
-        steps:
-            - run: pip install -r requirements.txt
-            - run: python 

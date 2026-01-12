@@ -7,7 +7,6 @@ import alibabacloud_oss_v2.aio as oss_aio
 import cloudscraper
 from bs4 import BeautifulSoup
 import httpx
-import base64
 
 # 阿里云 OSS 相关常量
 # 凭证信息
@@ -81,10 +80,8 @@ async def save_image_local(image_url: str):
 
 async def get_image_list(save_oss: bool):
     scraper = cloudscraper.create_scraper()
-
     def get_page_url(num):
         return LINK_URL + f"?page={num}"
-
     result = []
     try:
         # 循环访问页面
@@ -100,10 +97,13 @@ async def get_image_list(save_oss: bool):
                 raise Exception("no data")
             for node in image_nodes:
                 print(node["src"])
-                await save_image_local(str(node["src"]))
+                if save_image_oss:
+                    await save_image_oss(str(node["src"]))
+                else:
+                    await save_image_local(str(node["src"]))
     except Exception as e:
         print(e)
 
 
 if __name__ == "__main__":
-    asyncio.run(get_image_list(save_oss=False))
+    asyncio.run(get_image_list(save_oss=True))

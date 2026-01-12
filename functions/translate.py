@@ -147,7 +147,7 @@ async def get_list_from_oss(mode: str) -> List[str]:
         return object_keys
 
 
-async def translate_all() -> None:
+async def translate_all_from_oss() -> None:
     """
     翻译crawler的目录下面的所有图片
     """
@@ -161,4 +161,4 @@ async def translate_all() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(translate_all())
+    asyncio.run(translate_all_from_oss())
