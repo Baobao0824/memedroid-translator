@@ -6,18 +6,29 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
-
+    <script src="https://gosspublic.alicdn.com/aliyun-oss-sdk-6.20.0.min.js"></script>
     <!-- Don't use this in production: -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   </head>
   <body>
     <div id="root"></div>
     <script type="text/babel">
-      function handleClick(){
-        alert('1')
+      const client = new OSS({
+        region: 'oss-cn-beijing',
+        authorizationV4: true
+      })
+
+      async function handleClick(){
+        try{
+          const result = await client.listBuckets()
+        }catch (err){
+          console.log(err)
+        }finally{
+          console.log(result)
+        }
       }
       function GetButton() {
-        return <button onClick={handleClick}>来一张</button>;
+        return <button>来一张</button>;
       }
       function MyApp() {
         return (
@@ -32,15 +43,5 @@
       const root = ReactDOM.createRoot(container);
       root.render(<MyApp />);
     </script>
-    <!--
-      Note: this page is a great way to try React but it's not suitable for production.
-      It slowly compiles JSX with Babel in the browser and uses a large development build of React.
-
-      Read this page for starting a new React project with JSX:
-      https://react.dev/learn/start-a-new-react-project
-
-      Read this page for adding React with JSX to an existing project:
-      https://react.dev/learn/add-react-to-an-existing-project
-    -->
   </body>
 </html>

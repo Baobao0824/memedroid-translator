@@ -1,0 +1,9 @@
+{
+    "port": 3000,
+    "APIKey": "",
+    "APIPassword": "",
+    "region": "oss-cn-beijing",
+    "bucket": "",
+    "enFolder": "memes_en",
+    "zhFolder": "chinese_memes"
+}

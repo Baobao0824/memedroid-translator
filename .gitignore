@@ -17,4 +17,7 @@ __pycache__/
 .idea/
 
 #DEV
-config.dev.yaml
+config.dev.*
+
+.venv/
+node_modules/
