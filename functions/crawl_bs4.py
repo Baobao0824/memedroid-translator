@@ -1,7 +1,7 @@
 import asyncio
 from pathlib import Path
 import hashlib
-from functions.config_loader import CONFIG
+from config_loader import CONFIG
 import alibabacloud_oss_v2 as oss
 import alibabacloud_oss_v2.aio as oss_aio
 import cloudscraper

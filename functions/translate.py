@@ -1,12 +1,12 @@
 from typing import List
 import httpx
-import functions.youdao_utils as youdao_utils
+import youdao_utils as youdao_utils
 import asyncio
 from pathlib import Path
 import base64
 import alibabacloud_oss_v2 as oss
 import alibabacloud_oss_v2.aio as oss_aio
-from functions.config_loader import CONFIG
+from config_loader import CONFIG
 
 # 有道的应用ID和密钥，从配置文件中获取
 APP_ID = CONFIG["translate"]["app_id"]

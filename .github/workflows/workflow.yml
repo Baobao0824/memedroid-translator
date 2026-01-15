@@ -28,7 +28,7 @@ jobs:
           pip install -r functions/requirements.txt
       - name: Create config file
         run: |
-          cat > config.yaml << 'EOF'
+          cat > functions/config.yaml << 'EOF'
           ${{ secrets.CONFIG_CONTENT }}
           EOF
       # 步骤4：运行脚本
