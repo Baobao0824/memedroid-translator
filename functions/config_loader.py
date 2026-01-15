@@ -2,7 +2,7 @@ from pathlib import Path
 import yaml
 from functions.config_dict import ConfigDict
 
-PROJECT_ROOT = Path(__file__)
+PROJECT_ROOT = Path(__file__).parent
 CONFIG_PATH = PROJECT_ROOT / "config.yaml"
 
 with CONFIG_PATH.open("r", encoding="utf-8") as f:
