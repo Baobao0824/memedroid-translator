@@ -1,7 +1,7 @@
 const express = require('express')
 const fs = require('fs')
 const OSS = require('ali-oss')
-const configObj = JSON.parse(fs.readFileSync('./config.json'))
+const configObj = JSON.parse(fs.readFileSync('./config.dev.json'))
 
 const ossClient = new OSS({
     region: configObj.region,
@@ -22,25 +22,50 @@ async function getRandomEnglishName() {
     }
     const len = result.length
     const randomNumber = Math.floor(Math.random() * len)
-    return result[randomNumber]
+    const resultName = result[randomNumber].name.replace('memes_en/','').replace('.jpg','')
+    return resultName
 }
 
-async function getEnglishImage(fileName) {
+async function getImageByName(isChinese,fileName) {
+    const folderName = isChinese? configObj.zhFolder : configObj.enFolder
+    const fullName = folderName +'/'+ fileName +'.jpg'
     try {
-        image = (await ossClient.get(fileName)).content
+        const image = (await ossClient.get(fullName)).content
+        return image
     } catch (err) {
         console.log(err)
     }
 }
 
+
 const expressApp = express()
 
-expressApp.get('/random-english', async (req, res) => {
+expressApp.get('/random-name', async (req, res) => {
     try {
-        const fileName = await getRandomEnglishName()
-        res.send({ fileName })   // 返回 JSON 给前端
+        const name  = await getRandomEnglishName()
+        res.send(name)   // 返回 JSON 给前端
     } catch (e) {
         res.status(500).send({ error: 'OSS error' + e })
+    }
+})
+
+expressApp.get('/chinese',async (req,res)=>{
+    try {
+        const image  = await getImageByName(true,req.query.name)
+        res.set('Content-Type', 'image/jpeg');
+        res.send(image)
+    } catch(e){
+        console.log(e)
+    }
+})
+
+expressApp.get('/english',async (req,res)=>{
+    try {
+        const image  = await getImageByName(false,req.query.name)
+        res.set('Content-Type', 'image/jpeg');
+        res.send(image)
+    } catch(e){
+        console.log(e)
     }
 })
 

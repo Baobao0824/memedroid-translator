@@ -2,10 +2,10 @@ name: workflow
 # 触发条件：每天UTC时间2点运行（北京时间10点）
 on:
   push:
-    branches: [ 'stable' ]
-  # schedule:
-  #   - cron: "0 2 * * *" # 每天凌晨2点UTC运行
-  # workflow_dispatch: # 允许手动触发，方便测试
+    branches: [ '*' ]
+  schedule:
+    - cron: "0 2 * * *" # 每天凌晨2点UTC运行
+  workflow_dispatch: # 允许手动触发，方便测试
 jobs:
   run-script:
     runs-on: ubuntu-latest
