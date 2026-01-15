@@ -1,5 +1,5 @@
-import crawl_bs4 as crawl
-import translate as translate
+import functions.crawl_bs4 as crawl
+import functions.translate as translate
 from datetime import datetime
 import asyncio
 
