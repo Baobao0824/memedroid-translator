@@ -1,6 +1,7 @@
 const express = require('express')
 const fs = require('fs')
 const OSS = require('ali-oss')
+const cors = require('cors')
 const configObj = JSON.parse(fs.readFileSync('./config.dev.json'))
 
 const ossClient = new OSS({
@@ -39,6 +40,7 @@ async function getImageByName(isChinese,fileName) {
 
 
 const expressApp = express()
+expressApp.use(cors())
 
 expressApp.get('/random-name', async (req, res) => {
     try {
