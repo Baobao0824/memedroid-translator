@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Hello World</title>
+    <title>随机meme生成器</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
@@ -12,33 +12,59 @@
   <body>
     <div id="root"></div>
     <script type="text/babel">
-      let image_name = "";
-      async function getImageName() {
-        axios.get("http://main.baobao0824.top:3000/random-name", (res) => {
-          console.log(res);
-        });
-      }
-
-      async function getEnglishImage(){
-      }
-
-      function GetButton({ language }) {
+      function MyApp() {
+        let image_name = "";
+        const [englishImage, setEnglishImage] = React.useState(null);
+        const [chineseImage, setChineseImage] = React.useState(null);
+        const baseURL = "https://api.baobao0824.top/";
+        async function getImageName() {
+          await axios.get(baseURL + "random-name").then((res) => {
+            image_name = res.data;
+          });
+        }
+        async function getEnglishImage() {
+          await axios
+            .get(baseURL + "english?name=" + image_name, {
+              responseType: "blob",
+            })
+            .then((res) => {
+              setEnglishImage(URL.createObjectURL(res.data));
+            });
+        }
+        async function getChineseImage() {
+          await axios
+            .get(baseURL + "chinese?name=" + image_name, {
+              responseType: "blob",
+            })
+            .then((res) => {
+              setChineseImage(URL.createObjectURL(res.data));
+            });
+        }
         async function handleClick() {
           try {
             await getImageName();
+            await getEnglishImage();
+            await getChineseImage();
           } catch (err) {
             console.log(err);
           } finally {
             console.log();
           }
         }
-        return <button onClick={handleClick}>来一张</button>;
-      }
-      function MyApp() {
         return (
-          <div>
-            <h1>Hello, world!</h1>
-            <GetButton></GetButton>
+          <div class="main">
+            <h1>随机meme生成器</h1>
+            <button onClick={handleClick}>来一张</button>
+            <div class="images">
+              <div>
+                <div>英文原文</div>
+                <img src={englishImage}></img>
+              </div>
+              <div>
+                <div>中文汉化</div>
+                <img src={chineseImage}></img>
+              </div>
+            </div>
           </div>
         );
       }
@@ -48,4 +74,34 @@
       root.render(<MyApp />);
     </script>
   </body>
+  <style>
+    .main {
+      display: flex;
+      flex-direction: column;
+    }
+    .images {
+      img {
+        width: 100%;
+        height: auto;
+      }
+      div{
+        display: flex;
+        margin: auto;
+        flex-direction: column;
+        width: 50%;
+      }
+      display: flex;
+      width: 60vw;
+      height: auto;
+      margin: auto;
+    }
+    button{
+      width: 500px;
+      height: 60px;
+      margin: auto;
+    }
+    h1{
+      margin: auto;
+    }
+  </style>
 </html>

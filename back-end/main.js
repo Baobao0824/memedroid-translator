@@ -11,11 +11,11 @@ const ossClient = new OSS({
     bucket: configObj.bucket
 })
 
-async function getRandomEnglishName() {
+async function getRandomChineseName() {
     let result = []
     try {
         result = (await ossClient.listV2({
-            'prefix': configObj.enFolder,
+            'prefix': configObj.zhFolder,
             'max-keys': 100
         })).objects
     } catch (err) {
@@ -23,7 +23,7 @@ async function getRandomEnglishName() {
     }
     const len = result.length
     const randomNumber = Math.floor(Math.random() * len)
-    const resultName = result[randomNumber].name.replace('memes_en/','').replace('.jpg','')
+    const resultName = result[randomNumber].name.replace(configObj.zhFolder+'/','').replace('.jpg','')
     return resultName
 }
 
@@ -44,7 +44,7 @@ expressApp.use(cors())
 
 expressApp.get('/random-name', async (req, res) => {
     try {
-        const name  = await getRandomEnglishName()
+        const name  = await getRandomChineseName()
         res.send(name)   // 返回 JSON 给前端
     } catch (e) {
         res.status(500).send({ error: 'OSS error' + e })
